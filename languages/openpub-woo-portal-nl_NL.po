@@ -1,0 +1,49 @@
+# Copyright (C) 2023 Acato
+# This file is distributed under the same license as the OpenPub WOO Portal plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: OpenPub WOO Portal 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/openpub-woo-portal\n"
+"POT-Creation-Date: 2023-04-19T09:49:17+02:00\n"
+"PO-Revision-Date: 2023-08-31 14:19+0200\n"
+"Last-Translator: Richard Korthuis <richardkorthuis@acato.nl>\n"
+"Language-Team: \n"
+"Language: nl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.2.2\n"
+"X-Domain: openpub-woo-portal\n"
+
+#. Plugin Name of the plugin
+msgid "OpenPub WOO Portal"
+msgstr "OpenPub WOO Portal"
+
+#. Plugin URI of the plugin
+msgid "https://www.openwebconcept.nl"
+msgstr "https://www.openwebconcept.nl"
+
+#. Description of the plugin
+msgid "Adds functionality to the OpenPub required for the WOO Portal."
+msgstr "Voegt functionaliteiten toe aan OpenPub die nodig zijn voor het WOO Portaal."
+
+#. Author of the plugin
+msgid "Acato"
+msgstr "Acato"
+
+#. Author URI of the plugin
+msgid "https://www.acato.nl"
+msgstr "https://www.acato.nl"
+
+#: src/restapi/class-restapi.php:92
+msgid "Year"
+msgstr "Jaar"
+
+#: src/restapi/class-restapi.php:96
+msgid "Post types"
+msgstr "Bericht typen"
+
+#: src/restapi/class-restapi.php:337
+msgid "Limit response to posts within (a) specific year(s)."
+msgstr "Beperk het resultaat tot berichten uit een specifiek jaar/jaren."
