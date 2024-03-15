@@ -338,13 +338,14 @@ class RestAPI extends \WP_REST_Controller {
 	 */
 	public function prepare_item_for_response( $item, $request ) {
 		$post = [
-			'Type'         => $item->post_type,
-			'ID'           => $this->get_meta( 'Kenmerk', $item ) ?: $this->get_meta( 'ID', $item ),
-			'Titel'        => $this->get_meta( 'Onderwerp', $item ) ?: $this->get_meta( 'Titel', $item ),
-			'Samenvatting' => $this->get_meta( 'Samenvatting', $item ) ?: $item->post_excerpt,
-			'Bijlagen'     => $this->map_attachments( $this->get_meta( 'Bijlagen', $item, false ) ?: $this->get_meta( 'Bijlagen_bestanden', $item, false ), $item ),
-			'Datum'        => $this->format_date( $this->get_meta( 'Besluitdatum', $item ) ?: $this->get_meta( 'Datum_ondertekening', $item ) ),
-			'Partijen'     => $this->map_parties( $this->get_meta( 'Partijen', $item, false ) ),
+			'Type'         		=> $item->post_type,
+			'ID'           		=> $this->get_meta( 'Kenmerk', $item ) ?: $this->get_meta( 'ID', $item ),
+			'Titel'        		=> $this->get_meta( 'Onderwerp', $item ) ?: $this->get_meta( 'Titel', $item ),
+			'Samenvatting' 		=> $this->get_meta( 'Samenvatting', $item ) ?: $item->post_excerpt,
+			'Bijlage_besluit' 	=> $this->get_meta( 'Bijlage_besluit', $item ) ?: '',
+			'Bijlagen'     		=> $this->map_attachments( $this->get_meta( 'Bijlagen', $item, false ) ?: $this->get_meta( 'Bijlagen_bestanden', $item, false ), $item ),
+			'Datum'        		=> $this->format_date( $this->get_meta( 'Besluitdatum', $item ) ?: $this->get_meta( 'Datum_ondertekening', $item ) ),
+			'Partijen'     		=> $this->map_parties( $this->get_meta( 'Partijen', $item, false ) ),
 		];
 
 		$rest_namespace = $this->post_type_mappings[ $item->post_type ]['rest_namespace'];
