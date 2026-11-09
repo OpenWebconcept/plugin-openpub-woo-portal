@@ -38,6 +38,7 @@ class RestAPI extends \WP_REST_Controller {
 			'rest_base'      => 'openwoo',
 			'rest_id'        => 'UUID',
 			'rest_namespace' => 'owc/openwoo/v1',
+			'date_meta_key'  => 'woo_Besluitdatum',
 		],
 		'openconvenant-item' => [
 			'meta_prefix'    => 'convenant',
@@ -45,6 +46,7 @@ class RestAPI extends \WP_REST_Controller {
 			'rest_id'        => 'slug',
 			'rest_namespace' => 'owc/openconvenanten/v1',
 			'slug_regex'     => '/^openconvenanten-(.*)/',
+			'date_meta_key'  => 'convenant_Datum_ondertekening',
 		],
 	];
 
@@ -58,9 +60,40 @@ class RestAPI extends \WP_REST_Controller {
 	}
 
 	/**
+	 * Apply the `owc_portal_post_type_mappings` filter, so other plugins can add their own post types to the portal.
+	 *
+	 * Each mapping requires `meta_prefix`, `rest_id` and `rest_namespace`; `slug_regex` and `date_meta_key` are optional.
+	 * The `date_meta_key` meta value must be stored as dd-mm-YYYY and is used for the year, before and after filters.
+	 * Post types that are not registered are skipped.
+	 */
+	private function filter_post_type_mappings() {
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- owc_ is the OpenWebConcept prefix.
+		$mappings = apply_filters( 'owc_portal_post_type_mappings', $this->post_type_mappings );
+
+		$this->post_type_mappings = array_filter(
+			is_array( $mappings ) ? $mappings : [],
+			function ( $mapping, $post_type ) {
+				return is_array( $mapping ) && ! empty( $mapping['meta_prefix'] ) && ! empty( $mapping['rest_id'] ) && ! empty( $mapping['rest_namespace'] ) && post_type_exists( $post_type );
+			},
+			ARRAY_FILTER_USE_BOTH
+		);
+	}
+
+	/**
+	 * Get the date meta keys of all mapped post types, escaped for use in SQL.
+	 *
+	 * @return string[]
+	 */
+	private function get_date_meta_keys() {
+		return array_map( 'esc_sql', array_values( array_filter( array_column( $this->post_type_mappings, 'date_meta_key' ) ) ) );
+	}
+
+	/**
 	 * Registers the routes for this API endpoint.
 	 */
 	public function register_routes() {
+		$this->filter_post_type_mappings();
+
 		\register_rest_route(
 			$this->namespace,
 			'items',
@@ -176,8 +209,8 @@ class RestAPI extends \WP_REST_Controller {
 			AND pm.meta_key IN ( '%s' )
 			GROUP BY YEAR( STR_TO_DATE( pm.meta_value, '%%d-%%m-%%Y' ) )
 			ORDER BY YEAR( STR_TO_DATE( pm.meta_value, '%%d-%%m-%%Y' ) )",
-			implode( "', '", array_keys( $this->post_type_mappings ) ),
-			implode( "', '", [ 'woo_Besluitdatum', 'convenant_Datum_ondertekening' ] )
+			implode( "', '", array_map( 'esc_sql', array_keys( $this->post_type_mappings ) ) ),
+			implode( "', '", $this->get_date_meta_keys() )
 		);
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -251,6 +284,8 @@ class RestAPI extends \WP_REST_Controller {
 		// Check for & assign any parameters which require special handling or setting.
 		$args['date_query'] = array();
 
+		$date_meta_keys = "'" . implode( "', '", $this->get_date_meta_keys() ) . "'";
+
 		if ( isset( $registered['modified_before'], $request['modified_before'] ) ) {
 			$args['date_query'][] = array(
 				'before' => $request['modified_before'],
@@ -268,7 +303,7 @@ class RestAPI extends \WP_REST_Controller {
 		if ( isset( $registered['owc_year'], $request['owc_year'] ) ) {
 			$year_where_clauses = [];
 			foreach ( $request['owc_year'] as $year ) {
-				$year_where_clauses[] = sprintf( "ID IN ( SELECT `post_id` FROM `{$wpdb->postmeta}` WHERE ( `meta_key` = 'woo_Besluitdatum' OR `meta_key` = 'convenant_Datum_ondertekening' ) AND YEAR( STR_TO_DATE( meta_value, '%%d-%%m-%%Y' ) ) = %d )", $year );
+				$year_where_clauses[] = sprintf( "ID IN ( SELECT `post_id` FROM `{$wpdb->postmeta}` WHERE `meta_key` IN ( {$date_meta_keys} ) AND YEAR( STR_TO_DATE( meta_value, '%%d-%%m-%%Y' ) ) = %d )", $year );
 			}
 			if ( count( $year_where_clauses ) ) {
 				$args['extend_where'][] = '( ' . implode( ' OR ', $year_where_clauses ) . ' )';
@@ -276,10 +311,10 @@ class RestAPI extends \WP_REST_Controller {
 		}
 
 		if ( isset( $registered['after'], $request['after'] ) ) {
-			$args['extend_where'][] = sprintf( "ID IN ( SELECT `post_id` FROM `{$wpdb->postmeta}` WHERE ( `meta_key` = 'woo_Besluitdatum' OR `meta_key` = 'convenant_Datum_ondertekening' ) AND STR_TO_DATE( meta_value, '%%d-%%m-%%Y' ) >= '%s' )", $request['after'] );
+			$args['extend_where'][] = sprintf( "ID IN ( SELECT `post_id` FROM `{$wpdb->postmeta}` WHERE `meta_key` IN ( {$date_meta_keys} ) AND STR_TO_DATE( meta_value, '%%d-%%m-%%Y' ) >= '%s' )", $request['after'] );
 		}
 		if ( isset( $registered['before'], $request['before'] ) ) {
-			$args['extend_where'][] = sprintf( "ID IN ( SELECT `post_id` FROM `{$wpdb->postmeta}` WHERE ( `meta_key` = 'woo_Besluitdatum' OR `meta_key` = 'convenant_Datum_ondertekening' ) AND STR_TO_DATE( meta_value, '%%d-%%m-%%Y' ) <= '%s' )", $request['before'] );
+			$args['extend_where'][] = sprintf( "ID IN ( SELECT `post_id` FROM `{$wpdb->postmeta}` WHERE `meta_key` IN ( {$date_meta_keys} ) AND STR_TO_DATE( meta_value, '%%d-%%m-%%Y' ) <= '%s' )", $request['before'] );
 		}
 
 		// Ensure our per_page parameter overrides any provided posts_per_page filter.
@@ -337,14 +372,16 @@ class RestAPI extends \WP_REST_Controller {
 	 * @return array|\WP_Error|\WP_REST_Response
 	 */
 	public function prepare_item_for_response( $item, $request ) {
+		$date_meta_key = $this->post_type_mappings[ $item->post_type ]['date_meta_key'] ?? '';
+
 		$post = [
 			'Type'         		=> $item->post_type,
 			'ID'           		=> $this->get_meta( 'Kenmerk', $item ) ?: $this->get_meta( 'ID', $item ),
-			'Titel'        		=> $this->get_meta( 'Onderwerp', $item ) ?: $this->get_meta( 'Titel', $item ),
+			'Titel'        		=> $this->get_meta( 'Onderwerp', $item ) ?: $this->get_meta( 'Titel', $item ) ?: $item->post_title,
 			'Samenvatting' 		=> $this->get_meta( 'Samenvatting', $item ) ?: $item->post_excerpt,
 			'Bijlage_besluit' 	=> $this->get_meta( 'Bijlage_besluit', $item ) ?: '',
 			'Bijlagen'     		=> $this->map_attachments( $this->get_meta( 'Bijlagen', $item, false ) ?: $this->get_meta( 'Bijlagen_bestanden', $item, false ), $item ),
-			'Datum'        		=> $this->format_date( $this->get_meta( 'Besluitdatum', $item ) ?: $this->get_meta( 'Datum_ondertekening', $item ) ),
+			'Datum'        		=> $this->format_date( ( $date_meta_key ? get_post_meta( $item->ID, $date_meta_key, true ) : '' ) ?: $this->get_meta( 'Besluitdatum', $item ) ?: $this->get_meta( 'Datum_ondertekening', $item ) ),
 			'Partijen'     		=> $this->map_parties( $this->get_meta( 'Partijen', $item, false ) ),
 		];
 
@@ -419,16 +456,19 @@ class RestAPI extends \WP_REST_Controller {
 	 */
 	private function map_attachments( $attachments, $post ) {
 		$attachments = ! empty( $attachments[0] ) ? $attachments[0] : [];
+		$prefix      = $this->post_type_mappings[ $post->post_type ]['meta_prefix'];
 
 		$items = [];
 		foreach ( $attachments as $attachment ) {
-			$item['Titel_Bijlage'] = $attachment['woo_Titel_Bijlage'] ?? $attachment['convenant_Bijlagen_Naam'] ?? '';
-			$item['URL_Bijlage']   = $attachment['woo_URL_Bijlage'] ?? $attachment['convenant_Bijlagen_URL'] ?? '';
+			$item['Titel_Bijlage'] = $attachment['woo_Titel_Bijlage'] ?? $attachment['convenant_Bijlagen_Naam'] ?? $attachment[ $prefix . '_Titel_Bijlage' ] ?? '';
+			$item['URL_Bijlage']   = $attachment['woo_URL_Bijlage'] ?? $attachment['convenant_Bijlagen_URL'] ?? $attachment[ $prefix . '_URL_Bijlage' ] ?? '';
 
 			if ( empty( $item['URL_Bijlage'] ) && isset( $attachment['convenant_Bijlagen_Bestand_id'] ) ) {
 				$item['URL_Bijlage'] = \wp_get_attachment_url( $attachment['convenant_Bijlagen_Bestand_id'] );
 			} elseif ( empty( $item['URL_Bijlage'] ) && isset( $attachment['woo_Bijlage'] ) ) {
 				$item['URL_Bijlage'] = $attachment['woo_Bijlage'];
+			} elseif ( empty( $item['URL_Bijlage'] ) && isset( $attachment[ $prefix . '_Bijlage' ] ) ) {
+				$item['URL_Bijlage'] = $attachment[ $prefix . '_Bijlage' ];
 			}
 
 			if ( ! empty( $item['Titel_Bijlage'] ) || ! empty( $item['URL_Bijlage'] ) ) {
